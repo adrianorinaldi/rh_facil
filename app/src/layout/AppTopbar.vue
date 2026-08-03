@@ -13,7 +13,7 @@ const { toggleMenu, toggleDarkMode, isDarkTheme } = useLayout();
             </button>
             <router-link to="/" class="layout-topbar-logo">
                 <img
-                    src="/public/cropped-logo.png"
+                    src="/cropped-logo.png"
                     alt="RH Fácil"
                 />
                 <span class="whitespace-nowrap font-semibold">RH Fácil</span>
