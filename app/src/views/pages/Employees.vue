@@ -88,7 +88,7 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
-const API_URL = 'http://localhost:5031/api/employees'
+const API_URL = '/api/employees'
 const employees = ref([])
 const loading = ref(false)
 const showModal = ref(false)
