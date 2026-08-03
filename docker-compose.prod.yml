@@ -1,0 +1,49 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: rhfacil-db-prod
+    restart: always
+    environment:
+      POSTGRES_USER: rhfacil_user
+      POSTGRES_PASSWORD: rhfacil_password
+      POSTGRES_DB: rhfacil_db
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    networks:
+      - rhfacil-network
+
+  api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: rhfacil-api-prod
+    restart: always
+    environment:
+      # Sobrescreve a string de conexão para apontar para o contêiner 'db' na mesma rede
+      ConnectionStrings__DefaultConnection: "Host=db;Database=rhfacil_db;Username=rhfacil_user;Password=rhfacil_password"
+    depends_on:
+      - db
+    networks:
+      - rhfacil-network
+
+  app:
+    build: 
+      context: ./app
+      dockerfile: Dockerfile
+    container_name: rhfacil-app-prod
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - rhfacil-network
+
+volumes:
+  postgres_data_prod:
+
+networks:
+  rhfacil-network:
+    driver: bridge
