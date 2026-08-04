@@ -70,7 +70,7 @@
 
       <template #footer>
         <Button label="Cancelar" icon="pi pi-times" text @click="closeModal" />
-        <Button label="Salvar" icon="pi pi-check" @click="saveEmployee" />
+        <Button label="Salvar" icon="pi pi-check" @click="saveEmployee" :loading="isSaving" />
       </template>
     </Dialog>
   </div>
@@ -78,6 +78,8 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useToast } from 'primevue/usetoast'
+import { useConfirm } from 'primevue/useconfirm'
 import Button from 'primevue/button'
 import Card from 'primevue/card'
 import DataTable from 'primevue/datatable'
@@ -88,12 +90,14 @@ import InputText from 'primevue/inputtext'
 import InputNumber from 'primevue/inputnumber'
 import Select from 'primevue/select'
 
+const toast = useToast()
+const confirm = useConfirm()
 const API_URL = '/api/employees'
 const employees = ref([])
 const loading = ref(false)
+const isSaving = ref(false)
 const showModal = ref(false)
 const isEditing = ref(false)
-
 const form = ref({
   id: 0,
   name: '',
@@ -137,6 +141,7 @@ const closeModal = () => {
 }
 
 const saveEmployee = async () => {
+  isSaving.value = true
   try {
     const method = isEditing.value ? 'PUT' : 'POST'
     const url = isEditing.value ? `${API_URL}/${form.value.id}` : API_URL
@@ -147,22 +152,43 @@ const saveEmployee = async () => {
       body: JSON.stringify(form.value)
     })
     
+    toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Dados salvos com sucesso!', life: 3000 })
     closeModal()
     fetchEmployees()
   } catch (error) {
-    console.error('Erro ao salvar:', error)
+    toast.add({ severity: 'error', summary: 'Erro', detail: 'Não foi possível salvar', life: 3000 })
+  } finally {
+    isSaving.value = false
   }
 }
 
-const deleteEmployee = async (id) => {
-  if (confirm('Tem certeza que deseja excluir?')) {
-    try {
-      await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
-      fetchEmployees()
-    } catch (error) {
-      console.error('Erro ao excluir:', error)
+const deleteEmployee = (id) => {
+  confirm.require({
+    message: 'Tem certeza que deseja excluir este colaborador?',
+    header: 'Confirmar Exclusão',
+    icon: 'pi pi-info-circle',
+    rejectLabel: 'Cancelar',
+    rejectProps: {
+        label: 'Cancelar',
+        severity: 'secondary',
+        outlined: true
+    },
+    acceptProps: {
+        label: 'Excluir',
+        severity: 'danger'
+    },
+    accept: async () => {
+      loading.value = true
+      try {
+        await fetch(`${API_URL}/${id}`, { method: 'DELETE' })
+        toast.add({ severity: 'success', summary: 'Confirmado', detail: 'Colaborador excluído!', life: 3000 })
+        fetchEmployees()
+      } catch (error) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao tentar excluir', life: 3000 })
+        loading.value = false
+      }
     }
-  }
+  })
 }
 
 onMounted(() => {
