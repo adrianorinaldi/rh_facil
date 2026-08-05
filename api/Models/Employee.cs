@@ -9,4 +9,5 @@ public class Employee
     public decimal Salary { get; set; }
     public string Status { get; set; } = "Ativo"; // Ativo, Férias, Desligado
     public DateTime HireDate { get; set; } = DateTime.UtcNow;
+    public ICollection<EmployeeAttachment> Attachments { get; set; } = new List<EmployeeAttachment>();
 }

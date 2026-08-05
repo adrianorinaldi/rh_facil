@@ -32,8 +32,9 @@
           </Column>
           <Column header="Ações" :exportable="false" style="min-width:8rem">
             <template #body="{ data }">
-              <Button icon="pi pi-pencil" outlined rounded class="mr-2" @click="openModal(data)" />
-              <Button icon="pi pi-trash" outlined rounded severity="danger" @click="deleteEmployee(data.id)" />
+              <Button v-tooltip.top="'Anexos'" icon="pi pi-paperclip" outlined rounded class="mr-2" severity="info" @click="openAttachmentsModal(data)" />
+              <Button v-tooltip.top="'Editar'" icon="pi pi-pencil" outlined rounded class="mr-2" @click="openModal(data)" />
+              <Button v-tooltip.top="'Excluir'" icon="pi pi-trash" outlined rounded severity="danger" @click="deleteEmployee(data.id)" />
             </template>
           </Column>
 
@@ -73,6 +74,31 @@
         <Button label="Salvar" icon="pi pi-check" @click="saveEmployee" :loading="isSaving" />
       </template>
     </Dialog>
+
+    <!-- Modal de Anexos -->
+    <Dialog v-model:visible="showAttachmentsModal" header="Anexos do Colaborador" :modal="true" :style="{ width: '600px' }">
+      <div v-if="currentEmployee" class="flex flex-column gap-3 py-3">
+        <div class="flex align-items-center gap-3">
+          <input type="file" ref="fileInput" style="display: none;" @change="onFileSelected" accept=".pdf,image/*" />
+          <Button label="Adicionar Anexo" icon="pi pi-upload" @click="$refs.fileInput.click()" :loading="isUploading" />
+        </div>
+        
+        <DataTable :value="attachments" :loading="loadingAttachments" emptyMessage="Nenhum anexo encontrado.">
+          <Column field="fileName" header="Nome do Arquivo"></Column>
+          <Column header="Data" style="width: 120px">
+            <template #body="{ data }">
+              {{ new Date(data.uploadedAt).toLocaleDateString('pt-BR') }}
+            </template>
+          </Column>
+          <Column header="Ações" style="width: 120px">
+            <template #body="{ data }">
+              <Button v-tooltip.top="'Baixar Arquivo'" icon="pi pi-download" text rounded severity="success" @click="downloadAttachment(data)" />
+              <Button v-tooltip.top="'Excluir Arquivo'" icon="pi pi-trash" text rounded severity="danger" @click="deleteAttachment(data.id)" />
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+    </Dialog>
   </div>
 </template>
 
@@ -97,6 +123,12 @@ const employees = ref([])
 const loading = ref(false)
 const isSaving = ref(false)
 const showModal = ref(false)
+const showAttachmentsModal = ref(false)
+const currentEmployee = ref(null)
+const attachments = ref([])
+const loadingAttachments = ref(false)
+const isUploading = ref(false)
+const fileInput = ref(null)
 const isEditing = ref(false)
 const form = ref({
   id: 0,
@@ -138,6 +170,100 @@ const openModal = (emp = null) => {
 
 const closeModal = () => {
   showModal.value = false
+}
+
+const openAttachmentsModal = (emp) => {
+  currentEmployee.value = emp
+  showAttachmentsModal.value = true
+  fetchAttachments(emp.id)
+}
+
+const fetchAttachments = async (id) => {
+  loadingAttachments.value = true
+  try {
+    const res = await fetch(`${API_URL}/${id}/attachments`)
+    attachments.value = await res.json()
+  } catch (error) {
+    console.error('Erro ao buscar anexos:', error)
+  } finally {
+    loadingAttachments.value = false
+  }
+}
+
+const onFileSelected = async (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+
+  isUploading.value = true
+  toast.add({ severity: 'info', summary: 'Aguarde', detail: 'Enviando arquivo...', life: 2000 })
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  try {
+    const res = await fetch(`${API_URL}/${currentEmployee.value.id}/attachments`, {
+      method: 'POST',
+      body: formData
+    })
+    
+    if (res.ok) {
+      toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Anexo enviado!', life: 3000 })
+      fetchAttachments(currentEmployee.value.id)
+    } else {
+      toast.add({ severity: 'error', summary: 'Erro', detail: 'Falha ao enviar anexo', life: 3000 })
+    }
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro na conexão', life: 3000 })
+  } finally {
+    isUploading.value = false
+    event.target.value = '' // reset input
+  }
+}
+
+const downloadAttachment = async (attachment) => {
+  try {
+    const res = await fetch(`${API_URL}/attachments/${attachment.id}`)
+    if (!res.ok) throw new Error('Falha no download')
+    
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = attachment.fileName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao baixar arquivo', life: 3000 })
+  }
+}
+
+const deleteAttachment = (attachmentId) => {
+  confirm.require({
+    message: 'Tem certeza que deseja excluir este anexo?',
+    header: 'Confirmar Exclusão',
+    icon: 'pi pi-exclamation-triangle',
+    rejectLabel: 'Cancelar',
+    rejectProps: {
+        label: 'Cancelar',
+        severity: 'secondary',
+        outlined: true
+    },
+    acceptProps: {
+        label: 'Excluir',
+        severity: 'danger'
+    },
+    accept: async () => {
+      try {
+        await fetch(`${API_URL}/attachments/${attachmentId}`, { method: 'DELETE' })
+        toast.add({ severity: 'success', summary: 'Sucesso', detail: 'Anexo removido', life: 3000 })
+        fetchAttachments(currentEmployee.value.id)
+      } catch (error) {
+        toast.add({ severity: 'error', summary: 'Erro', detail: 'Erro ao remover', life: 3000 })
+      }
+    }
+  })
 }
 
 const saveEmployee = async () => {
